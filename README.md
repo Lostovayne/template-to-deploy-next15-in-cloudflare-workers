@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js 15 on Cloudflare Workers - Implementation Template
 
-## Getting Started
+This template demonstrates how to implement Next.js 15.1.4 on Cloudflare Workers using @opennextjs/cloudflare. This README provides a step-by-step guide to configure and deploy your application.
 
-First, run the development server:
+## Dependency Versions
+
+### Main Dependencies
+
+- next: ^15.1.4
+- react: ^19.0.0
+- react-dom: ^19.0.0
+- @opennextjs/cloudflare: ^0.3.8
+- wrangler: ^3.103.1
+
+### Development Dependencies
+
+- @cloudflare/workers-types: ^4.20250109.0
+- typescript: ^5
+- tailwindcss: ^3.4.1
+- postcss: ^8
+- eslint: ^9
+- eslint-config-next: 15.1.4
+
+## Step-by-Step Implementation Guide
+
+### 1. Initial Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Create new project (Option 1)
+npm create cloudflare@latest -- my-next-app --framework=next --experimental
+
+# Or configure existing project (Option 2)
+bun add  @opennextjs/cloudflare@latest
+bun add  wrangler@latest
+bun add -D @cloudflare/workers-types
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. File Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+#### 2.1 Create wrangler.json
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```json
+{
+	"main": ".open-next/worker.js",
+	"name": "my-app",
+	"compatibility_date": "2024-12-30",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	}
+}
+```
 
-## Learn More
+#### 2.2 Create open-next.config.ts
 
-To learn more about Next.js, take a look at the following resources:
+```typescript
+import type { OpenNextConfig } from "@opennextjs/aws/types/open-next.js";
+import cache from "@opennextjs/cloudflare/kvCache";
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+const config: OpenNextConfig = {
+	default: {
+		override: {
+			wrapper: "cloudflare-node",
+			converter: "edge",
+			incrementalCache: async () => cache,
+			tagCache: "dummy",
+			queue: "dummy"
+		}
+	},
+	middleware: {
+		external: true,
+		override: {
+			wrapper: "cloudflare-edge",
+			converter: "edge",
+			proxyExternalRequest: "fetch"
+		}
+	}
+};
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+export default config;
+```
 
-## Deploy on Vercel
+#### 2.3 Environment Variables Setup
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create `.dev.vars` file:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```plaintext
+NEXTJS_ENV=development
+```
+
+2. (Optional) Create `.dev.vars.example` as a template for other developers.
+
+### 3. Package.json Configuration
+
+Add the following scripts:
+
+```json
+{
+	"scripts": {
+		"dev": "next dev --turbopack",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint",
+		"build:worker": "opennextjs-cloudflare",
+		"dev:worker": "wrangler dev --port 8771",
+		"preview": "npm run build:worker && npm run dev:worker",
+		"deploy": "npm run build:worker && wrangler deploy",
+		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+	}
+}
+```
+
+## Available Commands
+
+- `npm run dev`: Start development server with Turbopack
+- `npm run build`: Build Next.js application
+- `npm run build:worker`: Build Cloudflare worker
+- `npm run dev:worker`: Start Wrangler development server
+- `npm run preview`: Build and preview worker locally
+- `npm run deploy`: Build and deploy worker to Cloudflare
+- `npm run cf-typegen`: Generate TypeScript types for Cloudflare environment
+
+## Important Notes
+
+1. Make sure you have a Cloudflare account and are authenticated with Wrangler.
+2. Minimum required Wrangler version is 3.99.0.
+3. The `.dev.vars` file should not be shared or committed to the repository.
+4. To enable KV cache, uncomment and configure the `kv_namespaces` section in `wrangler.json`.
+
+## Project Structure
+
+```
+├── .dev.vars                 # Development environment variables
+├── .dev.vars.example         # Environment variables template
+├── open-next.config.ts       # OpenNext configuration
+├── wrangler.json            # Cloudflare Workers configuration
+├── package.json             # Dependencies and scripts
+└── README.md               # This file
+```
+
+## Contributing
+
+If you find any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request.
